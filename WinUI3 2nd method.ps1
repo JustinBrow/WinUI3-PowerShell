@@ -1,12 +1,15 @@
+(Get-Runspace).count
+
+
 # cd 'C:\change\this'
-Add-Type -Path ".\WinRT.Runtime.dll"
-Add-Type -Path ".\Microsoft.Windows.SDK.NET.dll"
-Add-Type -Path ".\Microsoft.WindowsAppRuntime.Bootstrap.Net.dll"
-Add-Type -Path ".\Microsoft.InteractiveExperiences.Projection.dll"
-Add-Type -Path ".\Microsoft.WinUI.dll"
+Add-Type -Path '.\WinRT.Runtime.dll'
+Add-Type -Path '.\Microsoft.Windows.SDK.NET.dll'
+Add-Type -Path '.\Microsoft.WindowsAppRuntime.Bootstrap.Net.dll'
+Add-Type -Path '.\Microsoft.InteractiveExperiences.Projection.dll'
+Add-Type -Path '.\Microsoft.WinUI.dll'
 
 # //Setup runspacepool and shared variable
-$ConcurrentDict = [System.Collections.Concurrent.ConcurrentDictionary[string,object]]::new()
+$ConcurrentDict = [System.Collections.Concurrent.ConcurrentDictionary[string, object]]::new()
 $State = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
 $RunspaceVariable = [System.Management.Automation.Runspaces.SessionStateVariableEntry]::new('ConcurrentDict', $ConcurrentDict, $null)
 $State.Variables.Add($RunspaceVariable)
@@ -98,7 +101,7 @@ $Handle = $Powershell.BeginInvoke()
 class binder {
     # //Should inherit IPropertyNotifyChanged
     # //or a dependency object
-    binder(){}
+    binder() {}
     $tbContent = 'Without IPropertyNotifyChanged, this will not update'
 }
 $ConcurrentDict.binder = [binder]::new()
@@ -110,40 +113,42 @@ while ($ConcurrentDict.OnloadFinished -ne $true) {
 
 # //Send actions to dispatcher such as setting up buttons (Could also bind buttons through a class like above)
 $null = $ConcurrentDict.Dispatcher.TryEnqueue([scriptblock]::create({
-    # //This is inside the Window thread/runspace
-    # //Because ConcurrentDict is a shared variable, the Window thread can also access it
-    # //We have less access compared to wpf, where you could traverse the wpf object on any thread.
-    # //If you call $ConcurrentDict.Window.Content outside of this thread, it will be empty.
+            # //This is inside the Window thread/runspace
+            # //Because ConcurrentDict is a shared variable, the Window thread can also access it
+            # //We have less access compared to wpf, where you could traverse the wpf object on any thread.
+            # //If you call $ConcurrentDict.Window.Content outside of this thread, it will be empty.
 
-    $sp = $ConcurrentDict.Window.Content
-    $ConcurrentDict.Window.Content.DataContext = $ConcurrentDict.binder
+            $sp = $ConcurrentDict.Window.Content
+            $ConcurrentDict.Window.Content.DataContext = $ConcurrentDict.binder
 
-    $ok = $sp.FindName("okButton")
-    $cancel = $sp.FindName("cancelButton")
+            $ok = $sp.FindName('okButton')
+            $cancel = $sp.FindName('cancelButton')
     
-    $ok.add_Click([scriptblock]::create({
-        param($s, $e)
-        Write-Verbose "sender is: $($s.Name)" -Verbose
+            $ok.add_Click([scriptblock]::create({
+                        param($s, $e)
+                        Write-Verbose "sender is: $($s.Name)" -Verbose
         
-        [PwshWinUIApp]::OkWasClicked = $true
+                        [PwshWinUIApp]::OkWasClicked = $true
         
-        $ConcurrentDict.ThreadId = "Set from Thread Id: $([System.Threading.Thread]::CurrentThread.ManagedThreadId)"
-        $ConcurrentDict.Window.Close()
-    }.ToString()))
+                        $ConcurrentDict.ThreadId = "Set from Thread Id: $([System.Threading.Thread]::CurrentThread.ManagedThreadId)"
+                        $ConcurrentDict.Window.Close()
+                    }.ToString()))
     
-    $cancel.add_Click([scriptblock]::create({
-        param($s, $e)
-        Write-Verbose "sender is: $($s.Name)" -Verbose
+            $cancel.add_Click([scriptblock]::create({
+                        param($s, $e)
+                        Write-Verbose "sender is: $($s.Name)" -Verbose
         
-        $ConcurrentDict.ThreadId = "Set from Thread Id: $([System.Threading.Thread]::CurrentThread.ManagedThreadId)"
-        $ConcurrentDict.Window.Close()
-    }.ToString()))
-}.ToString()))
+                        $ConcurrentDict.ThreadId = "Set from Thread Id: $([System.Threading.Thread]::CurrentThread.ManagedThreadId)"
+                        $ConcurrentDict.Window.Close()
+                    }.ToString()))
+        }.ToString()))
 
 # //Finally show the window via dispatcher
-$Action = {$ConcurrentDict.Window.Activate()}.ToString()
+$Action = { $ConcurrentDict.Window.Activate() }.ToString()
 $NoContextAction = [scriptblock]::create($Action)
 $null = $ConcurrentDict.Window.DispatcherQueue.TryEnqueue($NoContextAction)
 
 "Current Thread Id: $([System.Threading.Thread]::CurrentThread.ManagedThreadId)"
 $ConcurrentDict
+
+(Get-Runspace).count
